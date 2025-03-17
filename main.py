@@ -10,52 +10,34 @@ import json
 import os
 from tkinter import filedialog
 
+
 CONFIG_FILE = "config.json"
 
 # 🔄 Funkce pro načtení konfigurace
 def load_config():
-    """Načte konfiguraci z config.json, pokud neexistuje, vrátí prázdné hodnoty."""
     if not os.path.exists(CONFIG_FILE):
         return {
             "captain_name": "",
             "first_officer": "",
-            "openai_api_key": ""
+            "openai_api_key": "",
+            "announcement_generator": "free",
+            "primary_language": "english",
+            "secondary_languages": [],
+            "captain_style": "professional",
+            "flight_data_file": ""
         }
     with open(CONFIG_FILE, "r", encoding="utf-8") as f:
         return json.load(f)
 
-# 💾 Funkce pro uložení konfigurace
+# 💾 Uložení konfigurace
 def save_config(config):
-    """Uloží konfiguraci do config.json."""
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
         json.dump(config, f, indent=4, ensure_ascii=False)
-
-# 🛠 Kontrola API klíče
-config = load_config()
-if not config.get("openai_api_key"):
-    root = tk.Tk()
-    root.withdraw()  # Skryje hlavní okno
-    api_key = simpledialog.askstring("Setup OPEN AI API", "Insert your OPEN AI API key:", show="*")
-    
-    if not api_key:
-        messagebox.showerror("Error", "Insert OpenAI API key!")
-        exit()
-
-    config["openai_api_key"] = api_key
-    save_config(config)
-
-# ✅ Teď už můžeme importovat announcement_generator
-import announcement_generator
 
 # 🔥 Spuštění Flask serveru v samostatném vlákně
 print("🚀 Spouštím Flask server...")
 flask_thread = threading.Thread(target=flask_server.start_flask_server, daemon=True)
 flask_thread.start()
-
-# 🌍 Možnosti pro jazyk a styl hlasu
-valid_languages = announcement_generator.valid_languages
-captain_styles = announcement_generator.captain_styles
-selected_languages = []
 
 def browse_flight_data_file():
     """Otevře dialog pro výběr flight_data.txt a uloží cestu do config.json."""
@@ -75,38 +57,58 @@ def browse_flight_data_file():
         # ✅ Okamžitě aktualizujeme cestu v běžícím flask_server
         flask_server.update_flight_data_path()
 
-
-
-def set_lua_script_path():
-    """Umožní uživateli vybrat složku, kde se nachází Lua skript, a uloží cestu do config.json."""
-    folder_selected = filedialog.askdirectory(title="Select Lua script folder")
-    
-    if folder_selected:
-        config = load_config()
-        config["lua_script_path"] = folder_selected
-        save_config(config)
-        messagebox.showinfo("Saved", "Lua script path saved successfully!")
-        update_flight_data_path()
-
-# ✈ **UI pro nastavení jazyka, hlasu a osobních údajů**
 def open_settings_window():
-    def browse_lua_script():
-        """Otevře dialog pro výběr Lua souboru nebo složky."""
-        path = filedialog.askdirectory()  # Můžeme použít `askopenfilename()` pokud chceme přesný soubor
-        if path:
-            lua_script_path_var.set(path)
+    def browse_flight_data_file():
+        file_path = filedialog.askopenfilename(title="Select flight_data.txt", filetypes=[("Text files", "*.txt")])
+        if file_path:
+            flight_data_file_var.set(file_path)
+
+    settings_window = tk.Tk()
+    settings_window.title("Voice and Language Setup")
+    settings_window.geometry("900x700")
+
+    frame = tk.Frame(settings_window, padx=15, pady=15)
+    frame.pack(fill="both", expand=True)
+
+    # 🔄 **Načtení konfigurace**
+    config = load_config()
+
+    # 🧑‍✈ **Vytvoření proměnných**
+    captain_name_var = tk.StringVar(value=config.get("captain_name", ""))
+    first_officer_var = tk.StringVar(value=config.get("first_officer", ""))
+    api_key_var = tk.StringVar(value=config.get("openai_api_key", ""))
+    primary_lang_var = tk.StringVar(value=config.get("primary_language", "english"))
+    flight_data_file_var = tk.StringVar(value=config.get("flight_data_file", ""))
+    generator_var = tk.StringVar(value=config.get("announcement_generator", "openai"))
+    style_var = tk.StringVar(value=config.get("captain_style", "professional"))
+
+    # 🔄 **Seznam jazyků**
+    language_list = [
+        "afrikaans", "arabic", "armenian", "azerbaijani", "belarusian", "bosnian", "bulgarian",
+        "catalan", "chinese", "croatian", "czech", "danish", "dutch", "english", "estonian",
+        "finnish", "french", "galician", "german", "greek", "hebrew", "hindi", "hungarian",
+        "icelandic", "indonesian", "italian", "japanese", "kannada", "kazakh", "korean",
+        "latvian", "lithuanian", "macedonian", "malay", "marathi", "maori", "nepali",
+        "norwegian", "persian", "polish", "portuguese", "romanian", "russian", "serbian",
+        "slovak", "slovenian", "spanish", "swahili", "swedish", "tagalog", "tamil", "thai",
+        "turkish", "ukrainian", "urdu", "vietnamese", "welsh"
+    ]
+
+    # 🌍 **Inicializace sekundárních jazyků**
+    secondary_vars = {}
+    for lang in language_list:
+        var = tk.BooleanVar(value=lang in config.get("secondary_languages", []))
+        secondary_vars[lang] = var
 
     def submit():
-        global primary_lang, secondary_langs, captain_style, captain_name, first_officer, openai_api_key, lua_script_path, flight_data_file
-
         primary_lang = primary_lang_var.get()
         secondary_langs = [lang for lang, var in secondary_vars.items() if var.get()]
         captain_style = style_var.get()
         captain_name = captain_name_var.get().strip()
         first_officer = first_officer_var.get().strip()
-        openai_api_key = api_key_var.get().strip()
-        lua_script_path = lua_script_path_var.get().strip()  # ✅ Zajištěná existence
-        flight_data_file = flight_data_file_var.get().strip()  # ✅ Nově přidáno
+        openai_api_key = api_key_var.get().strip() if generator_var.get() == "openai" else ""
+        flight_data_file = flight_data_file_var.get().strip()
+        generator = generator_var.get().strip()
 
         if not captain_name or not first_officer:
             messagebox.showwarning("Error", "Insert name of captain and first officer!")
@@ -117,17 +119,13 @@ def open_settings_window():
         if not captain_style:
             messagebox.showwarning("Error", "Choose voice tone!")
             return
-        if not openai_api_key:
-            messagebox.showwarning("Error", "Missing Open AI key!")
-            return
-        if not lua_script_path:
-            messagebox.showwarning("Error", "Select Lua script directory!")
+        if generator == "openai" and not openai_api_key:
+            messagebox.showwarning("Error", "Missing OpenAI API key! Please enter a valid key.")
             return
         if not flight_data_file:
             messagebox.showwarning("Error", "Select flight data file!")
             return
 
-        # 💾 Uložit do config.json
         save_config({
             "captain_name": captain_name,
             "first_officer": first_officer,
@@ -135,111 +133,84 @@ def open_settings_window():
             "primary_language": primary_lang,
             "secondary_languages": secondary_langs,
             "captain_style": captain_style,
-            "lua_script_path": lua_script_path,
-            "flight_data_file": flight_data_file
+            "flight_data_file": flight_data_file,
+            "announcement_generator": generator
         })
 
         messagebox.showinfo("Saved", "All good to go!")
         settings_window.destroy()
 
-    settings_window = tk.Tk()
-    settings_window.title("Voice and language setup")
-    settings_window.geometry("1200x850")  # Trochu zvětšíme okno pro novou kolonku
+    def toggle_api_key():
+        api_key_entry.config(state="normal" if generator_var.get() == "openai" else "disabled")
 
-    frame = tk.Frame(settings_window, padx=15, pady=15)
-    frame.pack(fill="both", expand=True)
-
-    # 🔄 Načtení konfigurace
-    config = load_config()
-
-    lua_script_path_var = tk.StringVar(value=config.get("lua_script_path", ""))
-    flight_data_file_var = tk.StringVar(value=config.get("flight_data_file", ""))
-
-
-    # 🧑‍✈ **Jméno kapitána a FO**
+    # 🏷 **Captain & First Officer Name**
     tk.Label(frame, text="Captain Name:", font=("Arial", 11)).grid(row=0, column=0, sticky="w", pady=5)
-    captain_name_var = tk.StringVar(value=config.get("captain_name", ""))
     tk.Entry(frame, textvariable=captain_name_var, font=("Arial", 11), width=30).grid(row=0, column=1, pady=5, sticky="ew")
 
     tk.Label(frame, text="First Officer Name:", font=("Arial", 11)).grid(row=1, column=0, sticky="w", pady=5)
-    first_officer_var = tk.StringVar(value=config.get("first_officer", ""))
     tk.Entry(frame, textvariable=first_officer_var, font=("Arial", 11), width=30).grid(row=1, column=1, pady=5, sticky="ew")
 
-    # 🔑 **API Klíč pro OpenAI**
-    tk.Label(frame, text="OpenAI API Key:", font=("Arial", 11)).grid(row=2, column=0, sticky="w", pady=5)
-    api_key_var = tk.StringVar(value=config.get("openai_api_key", ""))
-    tk.Entry(frame, textvariable=api_key_var, font=("Arial", 11), width=30, show="*").grid(row=2, column=1, pady=5, sticky="ew")
+    # 🗣 **Výběr hlasového generátoru**
+    tk.Label(frame, text="Voice Generator:", font=("Arial", 11)).grid(row=2, column=0, sticky="w", pady=5)
+    gen_frame = tk.Frame(frame)
+    gen_frame.grid(row=2, column=1, pady=5, sticky="w")
 
-    # 📂 Flight Data File Path
-    tk.Label(frame, text="Path to flight_data.txt:", font=("Arial", 11)).grid(row=4, column=0, sticky="w", pady=5)
-    tk.Entry(frame, textvariable=flight_data_file_var, font=("Arial", 11), width=30).grid(row=4, column=1, pady=5, sticky="ew")
-    tk.Button(frame, text="Browse", command=browse_flight_data_file, font=("Arial", 11)).grid(row=4, column=2, padx=5)
-    
+    tk.Radiobutton(gen_frame, text="OpenAI (Better quality, requires API key)", variable=generator_var, value="openai", font=("Arial", 10), command=toggle_api_key).pack(anchor="w")
+    tk.Radiobutton(gen_frame, text="Free (Offline, lower quality)", variable=generator_var, value="free", font=("Arial", 10), command=toggle_api_key).pack(anchor="w")
 
+    # 🔑 **API Klíč**
+    tk.Label(frame, text="OpenAI API Key:", font=("Arial", 11)).grid(row=3, column=0, sticky="w", pady=5)
+    api_key_entry = tk.Entry(frame, textvariable=api_key_var, font=("Arial", 11), width=30, show="*")
+    api_key_entry.grid(row=3, column=1, pady=5, sticky="ew")
 
-    # 🌍 **Primární jazyk**
-    tk.Label(frame, text="Primary language (will be used for communication between crew):", font=("Arial", 11)).grid(row=2, column=0, sticky="w", pady=5)
-    primary_lang_var = tk.StringVar(value="english")
-    primary_lang_dropdown = ttk.Combobox(frame, textvariable=primary_lang_var, values=[
-        "afrikaans", "arabic", "armenian", "azerbaijani", "belarusian", "bosnian", "bulgarian", 
-        "catalan", "chinese", "croatian", "czech", "danish", "dutch", "english", "estonian", 
-        "finnish", "french", "galician", "german", "greek", "hebrew", "hindi", "hungarian", 
-        "icelandic", "indonesian", "italian", "japanese", "kannada", "kazakh", "korean", 
-        "latvian", "lithuanian", "macedonian", "malay", "marathi", "maori", "nepali", 
-        "norwegian", "persian", "polish", "portuguese", "romanian", "russian", "serbian", 
-        "slovak", "slovenian", "spanish", "swahili", "swedish", "tagalog", "tamil", "thai", 
-        "turkish", "ukrainian", "urdu", "vietnamese", "welsh"
-    ], state="readonly", width=20)
-    primary_lang_dropdown.grid(row=2, column=1, pady=5, sticky="ew")
+    toggle_api_key()
 
-    # 📜 **Sekundární jazyky**
-    tk.Label(frame, text="Secondary language (you can select multiple):", font=("Arial", 11)).grid(row=3, column=0, sticky="w", pady=5)
+    # 📜 **Primární jazyk**
+    tk.Label(frame, text="Primary language:", font=("Arial", 11)).grid(row=4, column=0, sticky="w", pady=5)
+    ttk.Combobox(frame, textvariable=primary_lang_var, values=language_list, state="readonly", width=20).grid(row=4, column=1, pady=5, sticky="ew")
 
-    secondary_vars = {}
+    # 🌍 **Sekundární jazyky**
+    tk.Label(frame, text="Secondary languages:", font=("Arial", 11)).grid(row=5, column=0, sticky="w", pady=5)
     lang_frame = tk.Frame(frame)
-    lang_frame.grid(row=3, column=1, pady=5, sticky="ew")
+    lang_frame.grid(row=5, column=1, pady=5, sticky="ew")
 
-    langs_per_row = 5  # 🖥 Více jazyků na řádek → lepší přizpůsobení
-    lang_list = [
-        "afrikaans", "arabic", "armenian", "azerbaijani", "belarusian", "bosnian", "bulgarian", 
-        "catalan", "chinese", "croatian", "czech", "danish", "dutch", "english", "estonian", 
-        "finnish", "french", "galician", "german", "greek", "hebrew", "hindi", "hungarian", 
-        "icelandic", "indonesian", "italian", "japanese", "kannada", "kazakh", "korean", 
-        "latvian", "lithuanian", "macedonian", "malay", "marathi", "maori", "nepali", 
-        "norwegian", "persian", "polish", "portuguese", "romanian", "russian", "serbian", 
-        "slovak", "slovenian", "spanish", "swahili", "swedish", "tagalog", "tamil", "thai", 
-        "turkish", "ukrainian", "urdu", "vietnamese", "welsh"
-    ]
+    for i, lang in enumerate(language_list):
+        tk.Checkbutton(lang_frame, text=lang.capitalize(), variable=secondary_vars[lang], font=("Arial", 9)).grid(row=i // 5, column=i % 5, sticky="w")
 
-    row, col = 0, 0
-    for lang in lang_list:
-        var = tk.BooleanVar()
-        chk = tk.Checkbutton(lang_frame, text=lang.capitalize(), variable=var, font=("Arial", 9))
-        chk.grid(row=row, column=col, sticky="w", padx=5, pady=2)
-        secondary_vars[lang] = var
-        col += 1
-        if col >= langs_per_row:  # Po určitém počtu jazyků skočí na nový řádek
-            col = 0
-            row += 1
+    # 🎭 **Tón hlasu kapitána**
+    tk.Label(frame, text="Captain Style:", font=("Arial", 11)).grid(row=6, column=0, sticky="w", pady=5)
+    ttk.Combobox(frame, textvariable=style_var, values=["professional", "austere", "friendly", "experienced"], state="readonly", width=20).grid(row=6, column=1, pady=5, sticky="ew")
 
-    # 🎭 **Výběr stylu hlasu kapitána**
-    tk.Label(frame, text="Captain style:", font=("Arial", 11)).grid(row=4, column=0, sticky="w", pady=5)
-    style_var = tk.StringVar(value="professional")
+    # 📂 **Výběr flight_data.txt**
+    tk.Button(frame, text="Browse flight_data.txt", command=browse_flight_data_file).grid(row=7, column=0, columnspan=2, pady=5)
 
-    style_frame = tk.Frame(frame)
-    style_frame.grid(row=4, column=1, pady=5, sticky="ew")
-
-    for style in ["professional", "austere", "friendly", "experienced"]:
-        tk.Radiobutton(style_frame, text=style, variable=style_var, value=style.lower(), font=("Arial", 10)).pack(side="left", padx=5)
-
-    # ✅ **Tlačítko pro potvrzení**
-    submit_button = tk.Button(settings_window, text="confirm", command=submit, font=("Arial", 12))
-    submit_button.pack(pady=10)
+    # ✅ **Potvrzovací tlačítko**
+    tk.Button(settings_window, text="Confirm", command=submit, font=("Arial", 12)).pack(pady=10)
 
     settings_window.mainloop()
 
-# 🔥 Spustíme UI pro výběr jazyků, hlasu a jmen
+# Otevře okno pro nastavení a uloží konfiguraci
 open_settings_window()
+
+
+# ✅ Načteme novou konfiguraci po zavření okna
+config = load_config()
+
+# 💾 Proměnné se správně načtou z konfigurace
+captain_name = config["captain_name"]
+first_officer = config["first_officer"]
+openai_api_key = config["openai_api_key"]
+primary_lang = config["primary_language"]
+secondary_langs = config["secondary_languages"]
+captain_style = config["captain_style"]
+flight_data_file = config["flight_data_file"]
+generator = config["announcement_generator"]
+
+import announcement_generator
+# 🌍 Možnosti pro jazyk a styl hlasu
+valid_languages = announcement_generator.valid_languages
+captain_styles = announcement_generator.captain_styles
+selected_languages = []
 
 # 🛫 GUI pro potvrzení letu
 selected_flight = flight_selection.run_gui()
@@ -319,9 +290,28 @@ if selected_flight:
     if not flight_confirmed.get():
         exit()
 
-
-
     print(f"🛫 Potvrzen let: {selected_flight['flight_number']} ({selected_flight['origin']} → {selected_flight['destination']})")
+
+    # 🔥 Spuštění GUI Flight Phase Monitor v samostatném vlákně
+    print("🖥 Spouštím GUI Flight Phase Monitor...")
+    gui_thread = threading.Thread(target=flask_server.start_gui, daemon=True)
+    gui_thread.start()
+
+    # 👀 **Funkce pro sledování GUI**
+    def monitor_gui():
+        """Sleduje, zda GUI běží, a pokud se ukončí, vypne celý program."""
+        while True:
+            if not gui_thread.is_alive():
+                print("❌ GUI Flight Phase Monitor se ukončil! Vypínám celý skript...")
+                os._exit(1)  # Tvrdé ukončení programu
+            time.sleep(1)  # ✅ Každou sekundu kontroluje stav GUI
+
+    # 🚀 **Spustíme monitorovací vlákno**
+    monitor_thread = threading.Thread(target=monitor_gui, daemon=True)
+    monitor_thread.start()
+
+    # 🔥 **Kód pokračuje dál, nic se nezastaví!**
+    print("✅ GUI monitorovací vlákno běží na pozadí!")
 
     last_phase = None
     played_safety_announcement = False
@@ -389,5 +379,4 @@ if selected_flight:
             last_phase = phase
 
         time.sleep(5)
-
 

@@ -98,7 +98,7 @@ def read_flight_data():
 
 
 def start_gui():
-    """GUI pro sledování letových dat."""
+    """Spustí GUI pro sledování letových fází."""
     root = tk.Tk()
     root.title("Flight Phase Monitor")
 
@@ -142,6 +142,8 @@ app = Flask(__name__)
 def start_flask_server():
     """Spustí Flask server."""
     app.run(host='127.0.0.1', port=5000, debug=False, use_reloader=False)
+
+
 
 # **Spustíme server ve vlákně**
 if __name__ == "__main__":

@@ -11,6 +11,14 @@ import json
 from pydub import AudioSegment
 from pydub.effects import low_pass_filter, high_pass_filter
 import tempfile
+import pyttsx3
+import re
+
+def check():
+    """Kontrola OpenAI API klíče pouze při použití OpenAI generátoru."""
+    if config.get("announcement_generator", "free") == "openai" and not openai.api_key:
+        print("⚠️ Varování: OpenAI API klíč není nastaven! Přepínám na offline generátor.")
+        config["announcement_generator"] = "free"
 
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))  # Složka, kde je tento skript
@@ -29,7 +37,8 @@ def load_config():
         return {
             "captain_name": "",
             "first_officer": "",
-            "openai_api_key": ""
+            "openai_api_key": "",
+            "announcement_generator": "" 
         }
     with open(CONFIG_FILE, "r", encoding="utf-8") as f:
         return json.load(f)
@@ -40,31 +49,27 @@ config = load_config()
 # 🔑 Použití OpenAI API klíče
 openai.api_key = config.get("openai_api_key", "")
 
-# ✅ Kontrola, zda je API klíč vyplněný
-if not openai.api_key:
-    raise ValueError("❌ Chyba: OpenAI API klíč není nastaven v config.json! Zadejte ho v nastavení.")
-
 # 📢 Slovník obsahující hlášení pro jednotlivé fáze letu
 ANNOUNCEMENTS = {
-    "Gate": "Dámy a pánové, hovoří kapitán. Moje jméno je {captain_name} a společně s mým "
-                       "first officerem {first_officer} vás vítáme na palubě letu {flight_number} "
-                       "z {origin} do {destination} letadla {aircraft}. Náš let potrvá {flight_duration}. "
-                       "Děkujeme, že jste si pro svoji cestu dnes vybrali {airline}.",
+    "Gate": "Ladies and gentlemen, this is your captain speaking. My name is {captain_name} "
+                      "and together with my first officer {first_officer}, we welcome you onboard flight {flight_number} "
+                      "from {origin} to {destination} aboard our {aircraft}. Our flight duration will be {flight_duration}. "
+                      "Thank you for choosing {airline} for your journey today.",
     
-    "Pushback": "Cabin crew arm doors and crosscheck.",
+    "Pushback": "Cabin crew, arm doors and crosscheck.",
     
-    "Takeoff": "Cabin crew seats for take-off.",
+    "Takeoff": "Cabin crew, seats for takeoff.",
     
     "Descent": "Cabin crew, prepare cabin for landing.",
     
-    "Final": "Cabin crew seats for landing.",
+    "Final": "Cabin crew, seats for landing.",
     
-    "TaxiAfterLanding": "Dámy a pánové, vítejte v {destination}. Místní čas je {local_time} "
-                    "a venkovní teplota je {temperature} °C. Děkujeme, že jste si pro let vybrali {airline} "
-                    "a přejeme vám příjemnou dovolenou, návrat domů nebo další cestu. Jménem {airline} "
-                    "vám přejeme hezký den.",
+    "TaxiAfterLanding": "Ladies and gentlemen, welcome to {destination}. The local time is {local_time} "
+                     "and the outside temperature is {temperature} °C. Thank you for choosing {airline} "
+                     "for your flight, and we wish you a pleasant holiday, a safe journey home, or a smooth continuation of your travels. "
+                     "On behalf of {airline}, we wish you a wonderful day.",
     
-    "Deboarding": "Cabin crew disarm doors and crosscheck."
+    "Deboarding": "Cabin crew, disarm doors and crosscheck."
 }
 
 
@@ -79,7 +84,6 @@ AudioSegment.ffprobe = ffprobe_path
 
 # Add FFMPEG/bin to system PATH
 os.environ["PATH"] += os.pathsep + FFMPEG_DIR
-
 
 # Hlasy pro kapitána a cabin crew
 voice_captain = "onyx"
@@ -105,6 +109,7 @@ valid_languages = [
 played_announcements = set()
 
 def translate_safety_announcement(text, lang):
+    check()
     """Přeloží bezpečnostní hlášení do zvoleného jazyka."""
     prompt = f"Přelož následující bezpečnostní hlášení do jazyka {lang}:\n\n{text}"
 
@@ -121,34 +126,38 @@ def translate_safety_announcement(text, lang):
 
 # ✈️ Hlášení pro různé fáze letu
 def generate_announcement_text(phase, flight_info, flight_data):
+    check()
     if phase == "Gate":
-        return (f"Dámy a pánové, hovoří kapitán. Moje jméno je {flight_info['captain_name']} a společně s mým "
-                f"first officerem {flight_info['first_officer']} vás vítáme na palubě letu {flight_info['flight_number']} "
-                f"z {flight_info['origin']} do {flight_info['destination']} letadla {flight_info['aircraft']}. "
-                f"Náš let potrvá {flight_info['duration']}. Děkujeme, že jste si pro svoji cestu dnes vybrali {flight_info['airline']}.")
+        return (f"Ladies and gentlemen, this is your captain speaking. My name is {flight_info['captain_name']} "
+                f"and together with my first officer {flight_info['first_officer']}, we welcome you onboard flight "
+                f"{flight_info['flight_number']} from {flight_info['origin']} to {flight_info['destination']} "
+                f"aboard our {flight_info['aircraft']}. Our flight duration will be {flight_info['duration']}. "
+                f"Thank you for choosing {flight_info['airline']} for your journey today.")
 
     elif phase == "Pushback":
-        return "Cabin crew arm doors and crosscheck"
+        return "Cabin crew, arm doors and crosscheck"
 
     elif phase == "Takeoff":
-        return "Cabin crew seats for take-off"
+        return "Cabin crew, seats for takeoff"
 
     elif phase == "Descent" and flight_data["altitude"] < 10000:
         return "Cabin crew, prepare cabin for landing"
 
     elif phase == "Final" and flight_data["altitude"] < 5000:
-        return "Cabin crew seats for landing"
+        return "Cabin crew, seats for landing"
 
     elif phase == "TaxiAfterLanding":
-        return (f"Dámy a pánové, vítejte v {flight_info['destination']}. "
-                f"Místní čas je {time.strftime('%H:%M')} a venkovní teplota je {flight_data['temperature']} °C. "
-                f"Děkujeme, že jste si pro let vybrali {flight_info['airline']} a přejeme vám příjemnou dovolenou, návrat domů nebo další cestu. "
-                f"Jménem {flight_info['airline']} vám přejeme hezký den.")
+        return (f"Ladies and gentlemen, welcome to {flight_info['destination']}. "
+                f"The local time is {time.strftime('%H:%M')} and the outside temperature is {flight_data['temperature']} °C. "
+                f"Thank you for choosing {flight_info['airline']} for your flight, and we wish you a pleasant holiday, "
+                f"a safe journey home, or a smooth continuation of your travels. "
+                f"On behalf of {flight_info['airline']}, we wish you a wonderful day.")
 
     elif phase == "Deboarding":
-        return "Cabin crew disarm doors and crosscheck"
+        return "Cabin crew, disarm doors and crosscheck"
 
     return None
+
 
 # 🎛 PA systém efekt + radio efekt
 def generate_white_noise(duration_ms, volume_db=-30):
@@ -308,7 +317,9 @@ def generate_safety_announcement_text(aircraft_type):
 
 # 🔊 **Přehrání bezpečnostního hlášení nebo videa**
 def play_safety_announcement(aircraft_type, selected_video=None, primary_lang="english", secondary_langs=[]):
-    """Spustí bezpečnostní video nebo vygeneruje hlášení ve všech vybraných jazycích."""
+    """Spustí bezpečnostní video nebo vygeneruje bezpečnostní hlášení ve všech vybraných jazycích."""
+    
+    generator = config.get("announcement_generator", "openai")  # Defaultně OpenAI
 
     if selected_video and os.path.exists(selected_video):
         print(f"🎬 Přehrávám bezpečnostní video: {selected_video}")
@@ -316,32 +327,65 @@ def play_safety_announcement(aircraft_type, selected_video=None, primary_lang="e
         return
 
     print(f"🎙️ Generuji bezpečnostní hlášení pro letadlo {aircraft_type}...")
+
     base_text = generate_safety_announcement_text(aircraft_type)
-    langs_to_generate = [primary_lang] + secondary_langs
-    audio_files = []
 
-    for lang in langs_to_generate:
-        translated_text = translate_and_rephrase_announcement(base_text, lang, "profesionálně")
-        filename = f"safety_announcement_{lang}.mp3"
-        filtered_filename = generate_announcement(lang, translated_text, voice_crew, filename)
-        audio_files.append(filtered_filename)
+    if generator == "openai":
+        check()
+        # 🌍 Překládáme pouze pokud je zapnutý OpenAI generator
+        langs_to_generate = [primary_lang] + secondary_langs
+        audio_files = []
 
-    pygame.mixer.init()
-    for idx, file in enumerate(audio_files):
-        pygame.mixer.music.load(file)
-        pygame.mixer.music.play()
+        for lang in langs_to_generate:
+            translated_text = translate_and_rephrase_announcement(base_text, lang, "profesionálně")
+            filename = f"safety_announcement_{lang}.mp3"
+            filtered_filename = generate_announcement(lang, translated_text, voice_crew, filename)
+            audio_files.append(filtered_filename)
 
-        while pygame.mixer.music.get_busy():
-            pygame.time.Clock().tick(10)
+        # 🔊 Přehrání OpenAI hlášení
+        pygame.mixer.init()
+        for idx, file in enumerate(audio_files):
+            pygame.mixer.music.load(file)
+            pygame.mixer.music.play()
 
-        if idx < len(audio_files) - 1:
-            time.sleep(2)  # Pauza mezi jazyky
+            while pygame.mixer.music.get_busy():
+                pygame.time.Clock().tick(10)
+
+            if idx < len(audio_files) - 1:
+                time.sleep(2)  # ⏳ Pauza mezi jazyky
+
+    elif generator == "free":
+        # ✅ Free varianta (pyttsx3) pro offline režim
+        print("🎤 Initializing pyttsx3 (offline TTS for safety announcement)...")
+        engine = pyttsx3.init()
+        voices = engine.getProperty('voices')
+
+        # 🔄 Výběr hlasů (fallback na první hlas pokud není nalezen male/female)
+        male_voice = next((voice for voice in voices if "male" in voice.name.lower()), voices[0])
+        female_voice = next((voice for voice in voices if "female" in voice.name.lower()), voices[1])
+
+        print(f"🎙️ Free offline safety announcement: {base_text}")
+
+        engine.setProperty('rate', 125)  # Nastavení rychlosti
+        engine.setProperty('volume', 1.0)  # Nastavení hlasitosti
+
+        # 👨‍✈️ Kapitán → Mužský hlas
+        engine.setProperty('voice', female_voice.id)
+        engine.say(base_text)
+        engine.runAndWait()
 
     print("✅ Bezpečnostní hlášení dokončeno.")
 
-# 🌎 Překlad a přeformulování hlášení
+def clean_text(text):
+    """Odebere všechny emoji a ne-ASCII znaky z textu."""
+    text = text.encode("ascii", "ignore").decode()  # Odstraní znaky mimo ASCII
+    text = re.sub(r'[^\x00-\x7F]+', '', text)  # Další pojistka proti ne-ASCII znakům
+    return text
+
 def translate_and_rephrase_announcement(text, lang, style):
     """ Přeloží a přeformuluje hlášení do požadovaného jazyka a stylu. """
+    text = clean_text(text)  # ✅ Odstranění emoji a ne-ASCII znaků
+
     prompt = f"Přelož a přeformuluj následující hlášení do jazyka {lang} ve stylu {style}:\n\n{text}"
     
     response = openai.chat.completions.create(
@@ -356,16 +400,20 @@ def translate_and_rephrase_announcement(text, lang, style):
 
 # 📢 Přehrání hlášení
 def play_announcement(phase, flight_info, flight_data, primary_lang, secondary_langs, style):
+    """Přehrává hlášení podle vybraného generátoru (OpenAI nebo Free)."""
     if phase in played_announcements:
         return
 
+    generator = config.get("announcement_generator", "openai")  # Defaultně OpenAI
+
     print(f"🛫 Hlášení pro fázi letu: {phase}")
 
+    # 📝 Načtení textu hlášení
     text = ANNOUNCEMENTS.get(phase)
     if not text:
         return
 
-    # Doplníme proměnné do hlášení
+    # 🔄 Doplníme proměnné do hlášení
     text = text.format(
         captain_name=flight_info["captain_name"],
         first_officer=flight_info["first_officer"],
@@ -379,31 +427,51 @@ def play_announcement(phase, flight_info, flight_data, primary_lang, secondary_l
         temperature=flight_data.get("temperature", "N/A")
     )
 
-    # Pokud fáze patří mezi ty, které mají být ve více jazycích, přeložíme do všech
-    langs_to_generate = [primary_lang] + secondary_langs if phase in MULTILINGUAL_ANNOUNCEMENTS else [primary_lang]
+    if generator == "openai":
+        check()
+        # 🌍 Překládáme jen fáze, které to vyžadují
+        langs_to_generate = [primary_lang] + secondary_langs if phase in MULTILINGUAL_ANNOUNCEMENTS else [primary_lang]
 
-    audio_files = []
+        # 🎙 OpenAI TTS
+        audio_files = []
+        for lang in langs_to_generate:
+            translated_text = translate_and_rephrase_announcement(text, lang, style)
+            filename = f"announcement_{phase}_{lang}.mp3"
+            filtered_filename = generate_announcement(lang, translated_text, voice_captain, filename)
+            audio_files.append(filtered_filename)
 
-    # 📝 Nejprve generujeme hlášení pro všechny jazyky
-    for lang in langs_to_generate:
-        translated_text = translate_and_rephrase_announcement(text, lang, style)
-        filename = f"announcement_{phase}_{lang}.mp3"
-        filtered_filename = generate_announcement(lang, translated_text, voice_captain, filename)
-        audio_files.append(filtered_filename)
+        # 🔊 Přehrání OpenAI hlášení
+        pygame.mixer.init()
+        for idx, file in enumerate(audio_files):
+            pygame.mixer.music.load(file)
+            pygame.mixer.music.play()
+            while pygame.mixer.music.get_busy():
+                pygame.time.Clock().tick(10)
+            if idx < len(audio_files) - 1:
+                time.sleep(2)  # ⏳ Pauza mezi jazyky
 
-    # 🔊 Poté je postupně přehráváme s pauzou mezi jazyky, pokud je více jazyků
-    pygame.mixer.init()
-    for idx, file in enumerate(audio_files):
-        pygame.mixer.music.load(file)
-        pygame.mixer.music.play()
-        
-        while pygame.mixer.music.get_busy():
-            pygame.time.Clock().tick(10)
+    elif generator == "free":
+        # ✅ Inicializace pyttsx3 jen pokud je potřeba (OFFLINE varianta)
+        print("🎤 Initializing pyttsx3 (offline TTS)...")
+        engine = pyttsx3.init()
+        voices = engine.getProperty('voices')
 
-        if idx < len(audio_files) - 1:
-            time.sleep(2)  # ⏳ Pauza 2 sekundy mezi jazyky
+        # 🔄 Výběr hlasů (fallback na první hlas pokud není nalezen male/female)
+        male_voice = next((voice for voice in voices if "male" in voice.name.lower()), voices[0])
+        female_voice = next((voice for voice in voices if "female" in voice.name.lower()), voices[1])
+
+        print(f"🎙️ Free offline announcement: {text}")
+
+        engine.setProperty('rate', 125)  # Nastavení rychlosti
+        engine.setProperty('volume', 1.0)  # Nastavení hlasitosti
+
+        # 👨‍✈️ Kapitán → Mužský hlas
+        engine.setProperty('voice', male_voice.id)
+        engine.say(text)
+        engine.runAndWait()
 
     played_announcements.add(phase)
+
 
 # 🔧 Funkce pro generování audia
 def generate_announcement(lang, text, voice, filename):
