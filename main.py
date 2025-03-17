@@ -8,7 +8,7 @@ from tkinter.scrolledtext import ScrolledText
 from tkinter import simpledialog, messagebox
 import json
 import os
-
+from tkinter import filedialog
 
 CONFIG_FILE = "config.json"
 
@@ -57,18 +57,57 @@ valid_languages = announcement_generator.valid_languages
 captain_styles = announcement_generator.captain_styles
 selected_languages = []
 
+def browse_flight_data_file():
+    """Otevře dialog pro výběr flight_data.txt a uloží cestu do config.json."""
+    file_path = filedialog.askopenfilename(title="Select flight_data.txt", filetypes=[("Text files", "*.txt")])
+    
+    if file_path:
+        config = load_config()
+        config["flight_data_file"] = file_path  # Uložíme cestu do JSON
+        save_config(config)
+
+        # ✅ Aktualizujeme proměnnou v GUI, pokud existuje
+        if 'flight_data_file_var' in globals():
+            flight_data_file_var.set(file_path)
+
+        messagebox.showinfo("Saved", "Flight data file path saved successfully!")
+
+        # ✅ Okamžitě aktualizujeme cestu v běžícím flask_server
+        flask_server.update_flight_data_path()
+
+
+
+def set_lua_script_path():
+    """Umožní uživateli vybrat složku, kde se nachází Lua skript, a uloží cestu do config.json."""
+    folder_selected = filedialog.askdirectory(title="Select Lua script folder")
+    
+    if folder_selected:
+        config = load_config()
+        config["lua_script_path"] = folder_selected
+        save_config(config)
+        messagebox.showinfo("Saved", "Lua script path saved successfully!")
+        update_flight_data_path()
+
 # ✈ **UI pro nastavení jazyka, hlasu a osobních údajů**
 def open_settings_window():
+    def browse_lua_script():
+        """Otevře dialog pro výběr Lua souboru nebo složky."""
+        path = filedialog.askdirectory()  # Můžeme použít `askopenfilename()` pokud chceme přesný soubor
+        if path:
+            lua_script_path_var.set(path)
+
     def submit():
-        global primary_lang, secondary_langs, captain_style, captain_name, first_officer, openai_api_key
-    
+        global primary_lang, secondary_langs, captain_style, captain_name, first_officer, openai_api_key, lua_script_path, flight_data_file
+
         primary_lang = primary_lang_var.get()
         secondary_langs = [lang for lang, var in secondary_vars.items() if var.get()]
         captain_style = style_var.get()
         captain_name = captain_name_var.get().strip()
         first_officer = first_officer_var.get().strip()
         openai_api_key = api_key_var.get().strip()
-    
+        lua_script_path = lua_script_path_var.get().strip()  # ✅ Zajištěná existence
+        flight_data_file = flight_data_file_var.get().strip()  # ✅ Nově přidáno
+
         if not captain_name or not first_officer:
             messagebox.showwarning("Error", "Insert name of captain and first officer!")
             return
@@ -81,7 +120,13 @@ def open_settings_window():
         if not openai_api_key:
             messagebox.showwarning("Error", "Missing Open AI key!")
             return
-    
+        if not lua_script_path:
+            messagebox.showwarning("Error", "Select Lua script directory!")
+            return
+        if not flight_data_file:
+            messagebox.showwarning("Error", "Select flight data file!")
+            return
+
         # 💾 Uložit do config.json
         save_config({
             "captain_name": captain_name,
@@ -89,23 +134,27 @@ def open_settings_window():
             "openai_api_key": openai_api_key,
             "primary_language": primary_lang,
             "secondary_languages": secondary_langs,
-            "captain_style": captain_style
+            "captain_style": captain_style,
+            "lua_script_path": lua_script_path,
+            "flight_data_file": flight_data_file
         })
-    
+
         messagebox.showinfo("Saved", "All good to go!")
         settings_window.destroy()
 
     settings_window = tk.Tk()
     settings_window.title("Voice and language setup")
-    settings_window.geometry("1200x800")  # Startovací velikost
-    settings_window.minsize(600, 400)  # Minimální velikost
-    settings_window.resizable(True, True)  # Roztahovatelnost
+    settings_window.geometry("1200x850")  # Trochu zvětšíme okno pro novou kolonku
 
     frame = tk.Frame(settings_window, padx=15, pady=15)
     frame.pack(fill="both", expand=True)
 
     # 🔄 Načtení konfigurace
     config = load_config()
+
+    lua_script_path_var = tk.StringVar(value=config.get("lua_script_path", ""))
+    flight_data_file_var = tk.StringVar(value=config.get("flight_data_file", ""))
+
 
     # 🧑‍✈ **Jméno kapitána a FO**
     tk.Label(frame, text="Captain Name:", font=("Arial", 11)).grid(row=0, column=0, sticky="w", pady=5)
@@ -119,7 +168,14 @@ def open_settings_window():
     # 🔑 **API Klíč pro OpenAI**
     tk.Label(frame, text="OpenAI API Key:", font=("Arial", 11)).grid(row=2, column=0, sticky="w", pady=5)
     api_key_var = tk.StringVar(value=config.get("openai_api_key", ""))
-    tk.Entry(frame, textvariable=api_key_var, font=("Arial", 11), width=30, show="*").grid(row=2, column=1, pady=5, sticky="ew")  # Skryje API klíč
+    tk.Entry(frame, textvariable=api_key_var, font=("Arial", 11), width=30, show="*").grid(row=2, column=1, pady=5, sticky="ew")
+
+    # 📂 Flight Data File Path
+    tk.Label(frame, text="Path to flight_data.txt:", font=("Arial", 11)).grid(row=4, column=0, sticky="w", pady=5)
+    tk.Entry(frame, textvariable=flight_data_file_var, font=("Arial", 11), width=30).grid(row=4, column=1, pady=5, sticky="ew")
+    tk.Button(frame, text="Browse", command=browse_flight_data_file, font=("Arial", 11)).grid(row=4, column=2, padx=5)
+    
+
 
     # 🌍 **Primární jazyk**
     tk.Label(frame, text="Primary language (will be used for communication between crew):", font=("Arial", 11)).grid(row=2, column=0, sticky="w", pady=5)
