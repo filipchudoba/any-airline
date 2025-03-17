@@ -35,7 +35,7 @@ def save_config(config):
         json.dump(config, f, indent=4, ensure_ascii=False)
 
 # 🔥 Spuštění Flask serveru v samostatném vlákně
-print("🚀 Spouštím Flask server...")
+print("🚀 Running Flask server...")
 flask_thread = threading.Thread(target=flask_server.start_flask_server, daemon=True)
 flask_thread.start()
 
@@ -290,7 +290,7 @@ if selected_flight:
     if not flight_confirmed.get():
         exit()
 
-    print(f"🛫 Potvrzen let: {selected_flight['flight_number']} ({selected_flight['origin']} → {selected_flight['destination']})")
+    print(f"🛫 Confirmed flight: {selected_flight['flight_number']} ({selected_flight['origin']} → {selected_flight['destination']})")
 
     # 🔥 Spuštění GUI Flight Phase Monitor v samostatném vlákně
     print("🖥 Spouštím GUI Flight Phase Monitor...")
@@ -302,7 +302,7 @@ if selected_flight:
         """Sleduje, zda GUI běží, a pokud se ukončí, vypne celý program."""
         while True:
             if not gui_thread.is_alive():
-                print("❌ GUI Flight Phase Monitor se ukončil! Vypínám celý skript...")
+                print("❌ GUI Flight Phase Monitor closed! Ending the script...")
                 os._exit(1)  # Tvrdé ukončení programu
             time.sleep(1)  # ✅ Každou sekundu kontroluje stav GUI
 
@@ -311,7 +311,7 @@ if selected_flight:
     monitor_thread.start()
 
     # 🔥 **Kód pokračuje dál, nic se nezastaví!**
-    print("✅ GUI monitorovací vlákno běží na pozadí!")
+    print("✅ GUI is running on background!")
 
     last_phase = None
     played_safety_announcement = False
@@ -322,7 +322,7 @@ if selected_flight:
 
         # 🛫 **Pokud je fáze "Pushback", nejprve proběhne "Cabin crew arm doors and crosscheck"**
         if phase == "Pushback" and not safety_announcement_triggered:
-            print("🛫 Pushback zahájen! Hlášení 'Cabin crew arm doors and crosscheck'...")
+            print("🛫 Pushback started! Arm doors and crosscheck")
             announcement_generator.play_announcement(
                 "Pushback",
                 {
@@ -344,13 +344,13 @@ if selected_flight:
 
             # 📢 **Po 10 sekundách spustíme bezpečnostní video nebo hlášení**
             if safety_announcement_option == "video" and os.path.exists(selected_safety_video):
-                print(f"🎬 Spouštím bezpečnostní video: {selected_safety_video}")
+                print(f"🎬 Playing safety video: {selected_safety_video}")
                 announcement_generator.play_safety_announcement(aircraft, selected_safety_video, primary_lang, secondary_langs)
             elif safety_announcement_option == "generated":
-                print("🎙️ Generuji a spouštím bezpečnostní hlášení...")
+                print("🎙️ Generating safety demo...")
                 announcement_generator.play_safety_announcement(aircraft, None, primary_lang, secondary_langs)
             else:
-                print("⏩ Přeskakuji bezpečnostní hlášení.")
+                print("⏩ Skipping safety demo.")
 
 
             played_safety_announcement = True

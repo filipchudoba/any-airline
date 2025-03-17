@@ -17,7 +17,7 @@ import re
 def check():
     """Kontrola OpenAI API klíče pouze při použití OpenAI generátoru."""
     if config.get("announcement_generator", "free") == "openai" and not openai.api_key:
-        print("⚠️ Varování: OpenAI API klíč není nastaven! Přepínám na offline generátor.")
+        print("⚠️ Warning: OpenAI API key is not set! Switching to offline generator.")
         config["announcement_generator"] = "free"
 
 
@@ -196,7 +196,7 @@ def apply_pa_system_effect(filename):
 def find_safety_videos(icao_code):
     """Najde všechna bezpečnostní videa pro danou aerolinku podle ICAO kódu."""
     if not os.path.exists(SAFETY_VIDEO_DIR):
-        print(f"❌ Složka '{SAFETY_VIDEO_DIR}' neexistuje!")
+        print(f"❌ Folder '{SAFETY_VIDEO_DIR}' doesnt exist!")
         return []
     
     videos = [
@@ -206,19 +206,19 @@ def find_safety_videos(icao_code):
     ]
 
     if not videos:
-        print(f"❌ Nebylo nalezeno žádné bezpečnostní video pro {icao_code}.")
+        print(f"❌ No video found for {icao_code}.")
     return videos
 
 
 def apply_distant_safety_effect(file_path):
     """Simuluje zvuk bezpečnostního hlášení za zavřenými dveřmi."""
-    print(f"🔧 Aplikuji efekt vzdáleného zvuku na {file_path}...")
+    print(f"🔧 Apply sound effect (distant) {file_path}...")
 
     # 🛠 Načteme zvukový soubor
     try:
         sound = AudioSegment.from_file(file_path)
     except Exception as e:
-        print(f"❌ Chyba při načítání souboru: {e}")
+        print(f"❌ Something went wrong when loading this file: {e}")
         return None
 
     # ✅ **Převod na mono (pokud není)**
@@ -239,7 +239,7 @@ def apply_distant_safety_effect(file_path):
         temp_wav_path = temp_wav.name
         stereo_sound.export(temp_wav_path, format="wav")
 
-    print(f"✅ Efekt aplikován, uložen do: {temp_wav_path}")
+    print(f"✅ Effect applied, saved to: {temp_wav_path}")
     return temp_wav_path
 
 # 🔊 **Surround efekt pro existující videa**
@@ -263,11 +263,11 @@ def apply_surround_effect(file_path):
 # 🔊 **Přehrání bezpečnostního videa se zajištěním kompatibility**
 def play_safety_video(video_path):
     """Přehrává bezpečnostní video se zvukovým efektem a opravou formátu."""
-    print(f"🎬 Přehrávám bezpečnostní video: {video_path}")
+    print(f"🎬 Playing safety video: {video_path}")
 
     # Ujistíme se, že soubor existuje
     if not os.path.exists(video_path):
-        print(f"❌ Chyba: Soubor {video_path} neexistuje!")
+        print(f"❌ Error: File {video_path} does not exist!")
         return
 
     # 🛠 Aplikujeme vzdálený zvukový efekt
@@ -275,7 +275,7 @@ def play_safety_video(video_path):
 
     # Pokud aplikace efektu selže, použijeme původní soubor
     if not processed_audio:
-        print("⚠️ Varování: Nepodařilo se aplikovat efekt, používám původní soubor.")
+        print("⚠️ Warning: Unable to apply effect. Using previous file.")
         processed_audio = video_path
 
     # 🎵 **Oprava formátu souboru**
@@ -288,10 +288,10 @@ def play_safety_video(video_path):
             sound.set_frame_rate(44100).set_channels(1).set_sample_width(2).export(temp_wav_path, format="wav")
         
         processed_audio = temp_wav_path
-        print(f"🔄 Zvuk převeden na správný formát: {processed_audio}")
+        print(f"🔄 Sound converted to the right format: {processed_audio}")
 
     except Exception as e:
-        print(f"❌ Chyba při konverzi souboru: {e}")
+        print(f"❌ Error when converting the file: {e}")
         return
 
     # 🔊 **Přehrání upraveného audio souboru**
@@ -322,11 +322,11 @@ def play_safety_announcement(aircraft_type, selected_video=None, primary_lang="e
     generator = config.get("announcement_generator", "openai")  # Defaultně OpenAI
 
     if selected_video and os.path.exists(selected_video):
-        print(f"🎬 Přehrávám bezpečnostní video: {selected_video}")
+        print(f"🎬 Playing safety video: {selected_video}")
         play_safety_video(selected_video)
         return
 
-    print(f"🎙️ Generuji bezpečnostní hlášení pro letadlo {aircraft_type}...")
+    print(f"🎙️ Generating safety video for {aircraft_type}...")
 
     base_text = generate_safety_announcement_text(aircraft_type)
 
@@ -374,7 +374,7 @@ def play_safety_announcement(aircraft_type, selected_video=None, primary_lang="e
         engine.say(base_text)
         engine.runAndWait()
 
-    print("✅ Bezpečnostní hlášení dokončeno.")
+    print("✅ Safety demo done.")
 
 def clean_text(text):
     """Odebere všechny emoji a ne-ASCII znaky z textu."""
@@ -406,7 +406,7 @@ def play_announcement(phase, flight_info, flight_data, primary_lang, secondary_l
 
     generator = config.get("announcement_generator", "openai")  # Defaultně OpenAI
 
-    print(f"🛫 Hlášení pro fázi letu: {phase}")
+    print(f"🛫 Announcment for phase of flight: {phase}")
 
     # 📝 Načtení textu hlášení
     text = ANNOUNCEMENTS.get(phase)
@@ -476,7 +476,7 @@ def play_announcement(phase, flight_info, flight_data, primary_lang, secondary_l
 # 🔧 Funkce pro generování audia
 def generate_announcement(lang, text, voice, filename):
     """ Vygeneruje hlášení pomocí OpenAI TTS a aplikuje PA efekt """
-    print(f"🎙️ Generuji hlášení ({lang.upper()} - {voice})")
+    print(f"🎙️ Generating announcement: ({lang.upper()} - {voice})")
 
     # Odeslání požadavku na OpenAI API
     response = openai.audio.speech.create(
@@ -489,7 +489,7 @@ def generate_announcement(lang, text, voice, filename):
     with open(filename, "wb") as f:
         f.write(response.content)
 
-    print(f"✅ Hlášení uloženo jako {filename}")
+    print(f"✅ Announcement saved as: {filename}")
 
     return apply_pa_system_effect(filename)
 

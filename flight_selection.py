@@ -16,12 +16,12 @@ def fetch_departures(airport_code):
     try:
         response = requests.get(url, headers=headers)
         if response.status_code != 200:
-            print(f"❌ Chyba: {response.status_code}")
+            print(f"❌ Error: {response.status_code}")
             return []
         
         data = response.json()
         if "result" not in data or "response" not in data["result"]:
-            print("❌ API nevrátilo platná data!")
+            print("❌ API returned wrong data!")
             return []
 
         # 📌 Získání informací o letišti
@@ -85,13 +85,13 @@ def fetch_departures(airport_code):
         return departures
 
     except requests.exceptions.RequestException as e:
-        print(f"❌ Chyba připojení k API: {e}")
+        print(f"❌ Error when connecting to the API: {e}")
         return []
     except ValueError:
-        print("❌ API vrátilo prázdnou nebo neplatnou odpověď!")
+        print("❌ API returned empty answer!")
         return []
     except KeyError as e:
-        print(f"❌ Chybějící klíč v odpovědi API: {e}")
+        print(f"❌ Missing key in the API request: {e}")
         return []
 
 # 🎛 **GUI pro výběr letu**

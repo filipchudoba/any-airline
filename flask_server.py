@@ -143,8 +143,6 @@ def start_flask_server():
     """Spustí Flask server."""
     app.run(host='127.0.0.1', port=5000, debug=False, use_reloader=False)
 
-
-
 # **Spustíme server ve vlákně**
 if __name__ == "__main__":
     start_gui()
