@@ -1,1 +1,1 @@
-# any-airline
+Creative Commons Attribution-NoDerivs 4.0
