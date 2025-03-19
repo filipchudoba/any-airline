@@ -26,7 +26,7 @@ SAFETY_VIDEO_DIR = os.path.join(SCRIPT_DIR, "safety_videos")  # Cesta ke složce
 
 
 # 🌍 Pouze tyto fáze se překládají do všech jazyků
-MULTILINGUAL_ANNOUNCEMENTS = {"Gate", "TaxiAfterLanding", "Safety"}
+MULTILINGUAL_ANNOUNCEMENTS = {"Gate", "TaxiAfterLanding", "Safety", "Descent"}
 
 CONFIG_FILE = "config.json"
 
@@ -60,7 +60,7 @@ ANNOUNCEMENTS = {
     
     "Takeoff": "Cabin crew, seats for takeoff.",
     
-    "Descent": "Cabin crew, prepare cabin for landing.",
+    "Descent": "Ladies and Gentleman we have started our descent to our destination, please make sure you have seatbelt fasten, window blind open, seat fully upright and trailtable stowed. In preparation for landing the toilets will be locked in about 5 minutes. Cabin crew, prepare cabin for landing.",
     
     "Final": "Cabin crew, seats for landing.",
     
@@ -86,7 +86,8 @@ AudioSegment.ffprobe = ffprobe_path
 os.environ["PATH"] += os.pathsep + FFMPEG_DIR
 
 # Hlasy pro kapitána a cabin crew
-voice_captain = "onyx"
+captain_voices = ["onyx", "ash"]
+voice_captain = random.choice(captain_voices)
 crew_voices = ["coral", "nova", "sage", "shimmer"]
 voice_crew = random.choice(crew_voices)  # Náhodný hlas cabin crew
 
@@ -141,17 +142,19 @@ def generate_announcement_text(phase, flight_info, flight_data):
         return "Cabin crew, seats for takeoff"
 
     elif phase == "Descent" and flight_data["altitude"] < 10000:
-        return "Cabin crew, prepare cabin for landing"
+        return "Ladies and Gentleman we have started our descent to our destination, please make sure you have seatbelt fasten, window blind open, seat fully upright and trailtable stowed. Cabin crew, prepare cabin for landing."
 
     elif phase == "Final" and flight_data["altitude"] < 5000:
         return "Cabin crew, seats for landing"
 
     elif phase == "TaxiAfterLanding":
         return (f"Ladies and gentlemen, welcome to {flight_info['destination']}. "
-                f"The local time is {time.strftime('%H:%M')} and the outside temperature is {flight_data['temperature']} °C. "
+                f"The local time is {int(flight_data['local_hours']):02}:{int(flight_data['local_minutes']):02} "
+                f"and the outside temperature is {flight_data['temperature']} °C. "
                 f"Thank you for choosing {flight_info['airline']} for your flight, and we wish you a pleasant holiday, "
                 f"a safe journey home, or a smooth continuation of your travels. "
                 f"On behalf of {flight_info['airline']}, we wish you a wonderful day.")
+
 
     elif phase == "Deboarding":
         return "Cabin crew, disarm doors and crosscheck"
@@ -302,9 +305,9 @@ def play_safety_video(video_path):
     while pygame.mixer.music.get_busy():
         pygame.time.Clock().tick(10)
 
-    # Po přehrání odstraníme dočasný soubor
-    if os.path.exists(processed_audio):
-        os.remove(processed_audio)
+    # ✅ Uvolnění Pygame mixeru, ale soubor **nezmizí**
+    pygame.mixer.quit()
+    print(f"✅ Audio playback finished. File remains: {processed_audio}")
 
 # 📢 **Generování bezpečnostního hlášení**
 def generate_safety_announcement_text(aircraft_type):
@@ -423,7 +426,7 @@ def play_announcement(phase, flight_info, flight_data, primary_lang, secondary_l
         aircraft=flight_info["aircraft"],
         airline=flight_info["airline"],
         flight_duration=flight_info["duration"],
-        local_time=time.strftime('%H:%M'),
+        local_time=flight_data.get("local_time", time.strftime('%H:%M')),
         temperature=flight_data.get("temperature", "N/A")
     )
 
@@ -437,7 +440,11 @@ def play_announcement(phase, flight_info, flight_data, primary_lang, secondary_l
         for lang in langs_to_generate:
             translated_text = translate_and_rephrase_announcement(text, lang, style)
             filename = f"announcement_{phase}_{lang}.mp3"
-            filtered_filename = generate_announcement(lang, translated_text, voice_captain, filename)
+
+            # Pokud je fáze TaxiAfterLanding, použijeme hlas crew místo kapitána
+            selected_voice = voice_crew if phase == "TaxiAfterLanding" else voice_captain
+
+            filtered_filename = generate_announcement(lang, translated_text, selected_voice, filename)
             audio_files.append(filtered_filename)
 
         # 🔊 Přehrání OpenAI hlášení

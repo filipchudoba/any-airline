@@ -9,9 +9,7 @@ def fetch_departures(airport_code):
     timestamp = int(time.time())
     url = f"https://api.flightradar24.com/common/v1/airport.json?code={airport_code}&plugin[]=&plugin-setting[schedule][mode]=departures&plugin-setting[schedule][timestamp]={timestamp}&page=1&limit=100"
 
-    headers = {
-        "User-Agent": "Mozilla/5.0"
-    }
+    headers = {"User-Agent": "Mozilla/5.0"}
 
     try:
         response = requests.get(url, headers=headers)
@@ -24,7 +22,6 @@ def fetch_departures(airport_code):
             print("❌ API returned wrong data!")
             return []
 
-        # 📌 Získání informací o letišti
         airport_data = data["result"]["response"]["airport"]["pluginData"]["details"]
         origin_name = airport_data.get("name", "Unknown")
         origin_iata = airport_data.get("code", {}).get("iata", "N/A")
@@ -38,13 +35,8 @@ def fetch_departures(airport_code):
 
             flight_number = flight_info.get("identification", {}).get("number", {}).get("default", "N/A")
             airline_info = flight_info.get("airline")
-            if airline_info:
-                airline = airline_info.get("name", "Unknown")
-                airline_icao = airline_info.get("code", {}).get("icao", "Unknown")
-            else:
-                airline = "Unknown"
-                airline_icao = "Unknown"
-
+            airline = airline_info.get("name", "Unknown") if airline_info else "Unknown"
+            airline_icao = airline_info.get("code", {}).get("icao", "Unknown") if airline_info else "Unknown"
 
             destination_info = flight_info.get("airport", {}).get("destination", {})
             destination_name = destination_info.get("name", "Unknown")
@@ -94,7 +86,29 @@ def fetch_departures(airport_code):
         print(f"❌ Missing key in the API request: {e}")
         return []
 
-# 🎛 **GUI pro výběr letu**
+def add_manual_flight(root):
+    """Otevře nové okno pro manuální zadání letu."""
+    manual_window = tk.Toplevel(root)
+    manual_window.title("Manuální zadání letu")
+
+    fields = ["flight_number", "airline", "airline_icao", "destination", "destination_iata", "destination_icao",
+              "departure_time", "origin", "origin_iata", "origin_icao", "aircraft", "duration"]
+    entries = {}
+
+    for field in fields:
+        tk.Label(manual_window, text=field.replace("_", " ").capitalize()).pack()
+        entry = tk.Entry(manual_window)
+        entry.pack()
+        entries[field] = entry
+
+    def save_manual_flight():
+        manual_flight = {field: entry.get() for field, entry in entries.items()}
+        root.selected_flight = manual_flight
+        manual_window.destroy()
+        root.destroy()
+    
+    tk.Button(manual_window, text="Uložit let", command=save_manual_flight).pack()
+
 def run_gui():
     """Spustí GUI pro výběr letu a vrátí vybraný let jako slovník."""
 
@@ -102,69 +116,46 @@ def run_gui():
         """Aktualizuje tabulku odletů na základě kódu letiště."""
         airport_code = airport_code_entry.get().upper()
         departures = fetch_departures(airport_code)
-
         departures_table.delete(*departures_table.get_children())  
-
+        
         if departures:
             for flight in departures:
-                departures_table.insert("", "end", values=(
-                    flight["flight_number"], flight["airline"], flight["airline_icao"],  flight["destination"],
-                    flight["destination_iata"], flight["destination_icao"],
-                    flight["departure_time"], flight["origin"], flight["origin_iata"], flight["origin_icao"],
-                    flight["aircraft"], flight["duration"]
-                ))
+                departures_table.insert("", "end", values=tuple(flight.values()))
         else:
-            departures_table.insert("", "end", values=("Žádná data", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-"))
+            departures_table.insert("", "end", values=("Žádná data",) * 12)
 
     def select_flight():
         """Uloží vybraný let a zavře okno."""
         selected_item = departures_table.selection()
         if not selected_item:
-            messagebox.showwarning("Chyba", "Nejprve vyberte let!")
+            messagebox.showwarning("Chyba", "Nejprve vyberte let nebo zadejte vlastní!")
             return
-
         flight_data = departures_table.item(selected_item)["values"]
-        selected_flight = {
-            "flight_number": flight_data[0],
-            "airline": flight_data[1],
-            "airline_icao": flight_data[2],
-            "destination": flight_data[3],
-            "destination_iata": flight_data[4],
-            "destination_icao": flight_data[5],
-            "departure_time": flight_data[6],
-            "origin": flight_data[7],
-            "origin_iata": flight_data[8],
-            "origin_icao": flight_data[9],
-            "aircraft": flight_data[10],  
-            "duration": flight_data[11]
-        }
-
-        root.selected_flight = selected_flight
+        root.selected_flight = dict(zip(
+            ["flight_number", "airline", "airline_icao", "destination", "destination_iata", "destination_icao",
+             "departure_time", "origin", "origin_iata", "origin_icao", "aircraft", "duration"],
+            flight_data
+        ))
         root.destroy()
-
+    
     root = tk.Tk()
-    root.title("Flight Departures Tracker")
+    root.title("Flight Tracker")
     root.selected_flight = None
-
-    tk.Label(root, text="IATA code of origin:", font=("Arial", 12)).pack(pady=5)
-    airport_code_entry = tk.Entry(root, font=("Arial", 12))
-    airport_code_entry.pack(pady=5)
-
-    fetch_button = tk.Button(root, text="Show departures", command=update_departures, font=("Arial", 12))
-    fetch_button.pack(pady=5)
-
-    columns = ("Flight Number", "Airline", "ICAO", "Destination", "IATA", "ICAO", "Time of departure", "Origin", "Origin IATA", "Origin ICAO", "Aircraft", "Duration")
-    global departures_table
+    
+    tk.Label(root, text="IATA code of origin:").pack()
+    airport_code_entry = tk.Entry(root)
+    airport_code_entry.pack()
+    tk.Button(root, text="Show departures", command=update_departures).pack()
+    tk.Button(root, text="Zadat vlastní let", command=lambda: add_manual_flight(root)).pack()
+    
+    columns = ["Flight Number", "Airline", "ICAO", "Destination", "IATA", "ICAO", "Time", "Origin", "IATA", "ICAO", "Aircraft", "Duration"]
     departures_table = ttk.Treeview(root, columns=columns, show="headings")
-
     for col in columns:
         departures_table.heading(col, text=col)
-        departures_table.column(col, width=120)
-
-    departures_table.pack(pady=10)
-
-    select_button = tk.Button(root, text="Choose flight", command=select_flight, font=("Arial", 12))
-    select_button.pack(pady=5)
-
+        departures_table.column(col, width=100)
+    departures_table.pack()
+    
+    tk.Button(root, text="Choose flight", command=select_flight).pack()
     root.mainloop()
     return root.selected_flight
+
