@@ -107,7 +107,7 @@ def add_manual_flight(root):
         manual_window.destroy()
         root.destroy()
     
-    tk.Button(manual_window, text="Uložit let", command=save_manual_flight).pack()
+    tk.Button(manual_window, text="Save the flight", command=save_manual_flight).pack()
 
 def run_gui():
     """Spustí GUI pro výběr letu a vrátí vybraný let jako slovník."""
@@ -128,7 +128,7 @@ def run_gui():
         """Uloží vybraný let a zavře okno."""
         selected_item = departures_table.selection()
         if not selected_item:
-            messagebox.showwarning("Chyba", "Nejprve vyberte let nebo zadejte vlastní!")
+            messagebox.showwarning("Chyba", "Flight is not selected. Choose one or enter your own!")
             return
         flight_data = departures_table.item(selected_item)["values"]
         root.selected_flight = dict(zip(
@@ -146,7 +146,7 @@ def run_gui():
     airport_code_entry = tk.Entry(root)
     airport_code_entry.pack()
     tk.Button(root, text="Show departures", command=update_departures).pack()
-    tk.Button(root, text="Zadat vlastní let", command=lambda: add_manual_flight(root)).pack()
+    tk.Button(root, text="Custom flight", command=lambda: add_manual_flight(root)).pack()
     
     columns = ["Flight Number", "Airline", "ICAO", "Destination", "IATA", "ICAO", "Time", "Origin", "IATA", "ICAO", "Aircraft", "Duration"]
     departures_table = ttk.Treeview(root, columns=columns, show="headings")

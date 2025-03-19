@@ -13,6 +13,7 @@ from pydub.effects import low_pass_filter, high_pass_filter
 import tempfile
 import pyttsx3
 import re
+import sys
 
 def check():
     """Kontrola OpenAI API klíče pouze při použití OpenAI generátoru."""
@@ -21,8 +22,18 @@ def check():
         config["announcement_generator"] = "free"
 
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))  # Složka, kde je tento skript
+SCRIPT_DIR = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 SAFETY_VIDEO_DIR = os.path.join(SCRIPT_DIR, "safety_videos")  # Cesta ke složce s videi
+
+# Ověření, zda složka existuje (a pokud ne, tak ji vytvoří)
+if not os.path.exists(SAFETY_VIDEO_DIR):
+    print(f"⚠️ Folder '{SAFETY_VIDEO_DIR}' doesnt exists! I will create one for you...")
+    os.makedirs(SAFETY_VIDEO_DIR)
+
+# Debug výpis
+print(f"🔹 Looking for directory: {SAFETY_VIDEO_DIR}")
+print(f"🔹 I have found the directory with following files inside: {os.listdir(SAFETY_VIDEO_DIR) if os.path.exists(SAFETY_VIDEO_DIR) else 'Folder is empty or doensnt exists'}")
+
 
 
 # 🌍 Pouze tyto fáze se překládají do všech jazyků

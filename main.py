@@ -1,15 +1,23 @@
+print("Please wait, program is starting...")
 import threading
+print("10%")
 import time
+print("20%")
 import flight_selection
-import flask_server
+print("30%")
 import tkinter as tk
+print("40%")
 from tkinter import ttk, messagebox
+print("50%")
 from tkinter.scrolledtext import ScrolledText
+print("60%")
 from tkinter import simpledialog, messagebox
+print("70%")
 import json
+print("80%")
 import os
+print("90%")
 from tkinter import filedialog
-
 
 CONFIG_FILE = "config.json"
 
@@ -33,11 +41,6 @@ def load_config():
 def save_config(config):
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
         json.dump(config, f, indent=4, ensure_ascii=False)
-
-# 🔥 Spuštění Flask serveru v samostatném vlákně
-print("🚀 Running Flask server...")
-flask_thread = threading.Thread(target=flask_server.start_flask_server, daemon=True)
-flask_thread.start()
 
 def browse_flight_data_file():
     """Otevře dialog pro výběr flight_data.txt a uloží cestu do config.json."""
@@ -189,12 +192,18 @@ def open_settings_window():
 
     settings_window.mainloop()
 
+print("100%")
 # Otevře okno pro nastavení a uloží konfiguraci
 open_settings_window()
 
 
 # ✅ Načteme novou konfiguraci po zavření okna
 config = load_config()
+import flask_server
+# 🔥 Spuštění Flask serveru v samostatném vlákně
+print("🚀 Starting... please wait...")
+flask_thread = threading.Thread(target=flask_server.start_flask_server, daemon=True)
+flask_thread.start()
 
 # 💾 Proměnné se správně načtou z konfigurace
 captain_name = config["captain_name"]
