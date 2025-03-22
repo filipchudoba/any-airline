@@ -1,0 +1,29 @@
+[Gate]
+Ladies and gentlemen, this is your captain speaking. My name is {captain_name} and together with my first officer {first_officer}, we welcome you onboard flight {flight_number} from {origin} to {destination} aboard our {aircraft}. Our flight duration will be approximately {flight_duration}. We will be departing from gate {gate}. Thank you for choosing {airline} for your journey today.
+
+[Pushback]
+Cabin crew, arm doors and crosscheck.
+
+[Takeoff]
+Cabin crew, seats for takeoff.
+
+[Descent]
+Ladies and gentlemen, we have started our descent to our destination. Please ensure your seatbelt is fastened, window blinds are open, seat is fully upright, and tray table is stowed. In preparation for landing, the toilets will be locked in about 5 minutes. Cabin crew, prepare the cabin for landing.
+
+[Final]
+Cabin crew, seats for landing.
+
+[TaxiAfterLanding]
+Ladies and gentlemen, welcome to {destination}. The local time is {local_time} and the outside temperature is {temperature} °C. Thank you for choosing {airline} for your flight, and we wish you a pleasant holiday, a safe journey home, or a smooth continuation of your travels. On behalf of {airline}, we wish you a wonderful day.
+
+[Deboarding]
+Cabin crew, disarm doors and crosscheck.
+
+[AirportBoarding]
+Ladies and gentlemen, your flight {flight_number} to {destination} is now ready for boarding at gate {gate}. Please have your boarding card ready for scanning and your travel document open on the picture page. On behalf of {airline}, we wish you a pleasant flight.
+
+[LastCall]
+Last call for passengers traveling on {airline} flight: {flight_number} to {destination}. Please proceed to gate {gate} immediately. Thank you.
+
+[InflightService]
+Ladies and gentlemen, we are now starting our inflight service. Today, we are offering the following food options: {food_options}. {beverage_service_info}. Thank you for your attention.
