@@ -18,8 +18,13 @@ print("80%")
 from pydub import AudioSegment
 print("90%")
 print("100%")
+import sys
 
+BASE_DIR = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(__file__)
 CONFIG_FILE = "config.json"
+
+# Dočasná proměnná pro uložení cesty k flight_data.txt
+pending_flight_data_path = None
 
 # 🔄 Function to load configuration
 def load_config():
@@ -48,6 +53,7 @@ def save_config(config):
 
 def browse_flight_data_file():
     """Opens a dialog to select flight_data.txt and saves the path to config.json."""
+    global pending_flight_data_path
     file_path = filedialog.askopenfilename(title="Select flight_data.txt", filetypes=[("Text files", "*.txt")])
     if file_path:
         config = load_config()
@@ -56,7 +62,115 @@ def browse_flight_data_file():
         if 'flight_data_file_var' in globals():
             flight_data_file_var.set(file_path)
         messagebox.showinfo("Saved", "Flight data file path saved successfully!")
-        flask_server.update_flight_data_path()
+        # Uložíme cestu do dočasné proměnné, aktualizace se provede později
+        pending_flight_data_path = file_path
+
+def open_language_order_window(parent, all_langs, airport_langs):
+    """Otevře okno pro nastavení pořadí jazyků."""
+    order_window = tk.Toplevel(parent)
+    order_window.title("Set Language Order")
+    order_window.geometry("600x800")
+
+    # Proměnné pro uložení pořadí
+    all_langs_order = all_langs.copy()
+    airport_langs_order = airport_langs.copy()
+
+    # Hlavní frame
+    main_frame = tk.Frame(order_window, padx=10, pady=10)
+    main_frame.pack(fill="both", expand=True)
+
+    # Sekce pro In-flight languages
+    inflight_frame = tk.LabelFrame(main_frame, text="In-flight Language Order", font=("Arial", 12, "bold"), padx=10, pady=10)
+    inflight_frame.pack(fill="both", expand=True, pady=5)
+
+    inflight_listbox = tk.Listbox(inflight_frame, font=("Arial", 11), height=10)
+    for lang in all_langs_order:
+        inflight_listbox.insert(tk.END, lang.capitalize())
+    inflight_listbox.pack(fill="both", expand=True, pady=5)
+
+    # Tlačítka pro přesun nahoru/dolů (In-flight)
+    def move_up_inflight():
+        selected_idx = inflight_listbox.curselection()
+        if not selected_idx:
+            return
+        idx = selected_idx[0]
+        if idx > 0:
+            lang = all_langs_order.pop(idx)
+            all_langs_order.insert(idx - 1, lang)
+            inflight_listbox.delete(0, tk.END)
+            for lang in all_langs_order:
+                inflight_listbox.insert(tk.END, lang.capitalize())
+            inflight_listbox.selection_set(idx - 1)
+
+    def move_down_inflight():
+        selected_idx = inflight_listbox.curselection()
+        if not selected_idx:
+            return
+        idx = selected_idx[0]
+        if idx < len(all_langs_order) - 1:
+            lang = all_langs_order.pop(idx)
+            all_langs_order.insert(idx + 1, lang)
+            inflight_listbox.delete(0, tk.END)
+            for lang in all_langs_order:
+                inflight_listbox.insert(tk.END, lang.capitalize())
+            inflight_listbox.selection_set(idx + 1)
+
+    tk.Button(inflight_frame, text="Up", command=move_up_inflight, font=("Arial", 10)).pack(side="left", padx=5)
+    tk.Button(inflight_frame, text="Down", command=move_down_inflight, font=("Arial", 10)).pack(side="left", padx=5)
+
+    # Sekce pro Airport languages
+    airport_frame = tk.LabelFrame(main_frame, text="Airport Language Order", font=("Arial", 12, "bold"), padx=10, pady=10)
+    airport_frame.pack(fill="both", expand=True, pady=5)
+
+    airport_listbox = tk.Listbox(airport_frame, font=("Arial", 11), height=10)
+    for lang in airport_langs_order:
+        airport_listbox.insert(tk.END, lang.capitalize())
+    airport_listbox.pack(fill="both", expand=True, pady=5)
+
+    # Tlačítka pro přesun nahoru/dolů (Airport)
+    def move_up_airport():
+        selected_idx = airport_listbox.curselection()
+        if not selected_idx:
+            return
+        idx = selected_idx[0]
+        if idx > 0:
+            lang = airport_langs_order.pop(idx)
+            airport_langs_order.insert(idx - 1, lang)
+            airport_listbox.delete(0, tk.END)
+            for lang in airport_langs_order:
+                airport_listbox.insert(tk.END, lang.capitalize())
+            airport_listbox.selection_set(idx - 1)
+
+    def move_down_airport():
+        selected_idx = airport_listbox.curselection()
+        if not selected_idx:
+            return
+        idx = selected_idx[0]
+        if idx < len(airport_langs_order) - 1:
+            lang = airport_langs_order.pop(idx)
+            airport_langs_order.insert(idx + 1, lang)
+            airport_listbox.delete(0, tk.END)
+            for lang in airport_langs_order:
+                airport_listbox.insert(tk.END, lang.capitalize())
+            airport_listbox.selection_set(idx + 1)
+
+    tk.Button(airport_frame, text="Up", command=move_up_airport, font=("Arial", 10)).pack(side="left", padx=5)
+    tk.Button(airport_frame, text="Down", command=move_down_airport, font=("Arial", 10)).pack(side="left", padx=5)
+
+    # Potvrzení a uložení pořadí
+    result = {"all_langs_order": None, "airport_langs_order": None, "confirmed": False}
+
+    def confirm_order():
+        result["all_langs_order"] = [(lang, idx + 1) for idx, lang in enumerate(all_langs_order)]
+        result["airport_langs_order"] = [(lang, idx + 1) for idx, lang in enumerate(airport_langs_order)]
+        result["confirmed"] = True
+        order_window.destroy()
+
+    tk.Button(order_window, text="Confirm", command=confirm_order, font=("Arial", 12), bg="#4CAF50", fg="white").pack(pady=10)
+
+    order_window.grab_set()
+    parent.wait_window(order_window)
+    return result
 
 def open_settings_window():
     settings_window = tk.Tk()
@@ -91,7 +205,7 @@ def open_settings_window():
     ]
 
     # Load list of chimes
-    chime_dir = os.path.join(os.path.dirname(__file__), "airport_chimes")
+    chime_dir = os.path.join(BASE_DIR, "airport_chimes")
     chime_files = ["none"] + [f for f in os.listdir(chime_dir) if f.endswith((".mp3", ".wav"))] if os.path.exists(chime_dir) else ["none"]
 
     # Secondary languages (including primary for ordering)
@@ -105,36 +219,6 @@ def open_settings_window():
     for lang in language_list:
         var = tk.BooleanVar(value=lang in config.get("airport_announcement_languages", []))
         airport_vars[lang] = var
-
-    # Order for all in-flight languages (including primary)
-    all_order_vars = {}
-    def update_all_order():
-        selected_langs = [lang for lang, var in secondary_vars.items() if var.get()]  # Only selected languages
-        all_frame = tk.Frame(inflight_order_frame, bg="#f0f0f0")
-        all_frame.pack(fill="x", pady=5)
-        for widget in all_frame.winfo_children():
-            widget.destroy()
-        all_order_vars.clear()  # Clear old values
-        for i, lang in enumerate(selected_langs):
-            var = tk.StringVar(value=str(i + 1))
-            all_order_vars[lang] = var
-            tk.Label(all_frame, text=f"{lang.capitalize()}:", font=("Arial", 9), bg="#f0f0f0").pack(side="left", padx=5)
-            tk.Entry(all_frame, textvariable=var, width=5, font=("Arial", 9)).pack(side="left", padx=5)
-
-    # Order for airport languages
-    airport_order_vars = {}
-    def update_airport_order():
-        selected_langs = [lang for lang, var in airport_vars.items() if var.get()]  # Only selected languages
-        airport_frame = tk.Frame(airport_order_frame, bg="#f0f0f0")
-        airport_frame.pack(fill="x", pady=5)
-        for widget in airport_frame.winfo_children():
-            widget.destroy()
-        airport_order_vars.clear()  # Clear old values
-        for i, lang in enumerate(selected_langs):
-            var = tk.StringVar(value=str(i + 1))
-            airport_order_vars[lang] = var
-            tk.Label(airport_frame, text=f"{lang.capitalize()}:", font=("Arial", 9), bg="#f0f0f0").pack(side="left", padx=5)
-            tk.Entry(airport_frame, textvariable=var, width=5, font=("Arial", 9)).pack(side="left", padx=5)
 
     # Function to play chime with validation
     def play_chime(chime_file):
@@ -158,12 +242,8 @@ def open_settings_window():
         all_langs = [lang for lang, var in secondary_vars.items() if var.get()]
         if primary_lang not in all_langs:
             all_langs.append(primary_lang)
-        all_order = [(lang, int(var.get())) for lang, var in all_order_vars.items() if var.get().isdigit() and lang in all_langs]
-        all_langs_sorted = [lang for lang, _ in sorted(all_order, key=lambda x: x[1])] if all_order else all_langs
 
         airport_langs = [lang for lang, var in airport_vars.items() if var.get()]
-        airport_order = [(lang, int(var.get())) for lang, var in airport_order_vars.items() if var.get().isdigit() and lang in airport_langs]
-        airport_langs_sorted = [lang for lang, _ in sorted(airport_order, key=lambda x: x[1])] if airport_order else airport_langs
 
         captain_style = style_var.get()
         captain_name = captain_name_var.get().strip()
@@ -179,15 +259,23 @@ def open_settings_window():
             messagebox.showwarning("Error", "All required fields must be filled!")
             return
 
+        # Otevření okna pro nastavení pořadí jazyků
+        order_result = open_language_order_window(settings_window, all_langs, airport_langs)
+        if not order_result["confirmed"]:
+            return  # Uživatel zrušil nastavení pořadí
+
+        all_langs_order = order_result["all_langs_order"]
+        airport_langs_order = order_result["airport_langs_order"]
+
         save_config({
             "captain_name": captain_name,
             "first_officer": first_officer,
             "openai_api_key": openai_api_key,
             "primary_language": primary_lang,
             "secondary_languages": [lang for lang in all_langs if lang != primary_lang],
-            "all_language_order": all_order,
+            "all_language_order": all_langs_order,
             "airport_announcement_languages": airport_langs,
-            "airport_announcement_order": airport_order,
+            "airport_announcement_order": airport_langs_order,
             "captain_style": captain_style,
             "flight_data_file": flight_data_file,
             "announcement_generator": generator,
@@ -246,12 +334,7 @@ def open_settings_window():
     all_lang_frame = tk.Frame(inflight_frame, bg="#f0f0f0")
     all_lang_frame.pack(fill="x", pady=5)
     for i, lang in enumerate(language_list):
-        tk.Checkbutton(all_lang_frame, text=lang.capitalize(), variable=secondary_vars[lang], font=("Arial", 9), bg="#f0f0f0", command=update_all_order).grid(row=i // 5, column=i % 5, sticky="w", padx=5)
-
-    tk.Label(inflight_frame, text="In-flight language order:", font=("Arial", 11)).pack(anchor="w", pady=5)
-    inflight_order_frame = tk.Frame(inflight_frame)
-    inflight_order_frame.pack(fill="x", pady=5)
-    update_all_order()
+        tk.Checkbutton(all_lang_frame, text=lang.capitalize(), variable=secondary_vars[lang], font=("Arial", 9), bg="#f0f0f0").grid(row=i // 5, column=i % 5, sticky="w", padx=5)
 
     # Right column - Airport settings
     airport_frame = tk.LabelFrame(right_frame, text="Airport Announcement Settings", font=("Arial", 12, "bold"), padx=10, pady=10)
@@ -261,12 +344,7 @@ def open_settings_window():
     airport_lang_frame = tk.Frame(airport_frame, bg="#f0f0f0")
     airport_lang_frame.pack(fill="x", pady=5)
     for i, lang in enumerate(language_list):
-        tk.Checkbutton(airport_lang_frame, text=lang.capitalize(), variable=airport_vars[lang], font=("Arial", 9), bg="#f0f0f0", command=update_airport_order).grid(row=i // 5, column=i % 5, sticky="w", padx=5)
-
-    tk.Label(airport_frame, text="Airport language order:", font=("Arial", 11)).pack(anchor="w", pady=5)
-    airport_order_frame = tk.Frame(airport_frame)
-    airport_order_frame.pack(fill="x", pady=5)
-    update_airport_order()
+        tk.Checkbutton(airport_lang_frame, text=lang.capitalize(), variable=airport_vars[lang], font=("Arial", 9), bg="#f0f0f0").grid(row=i // 5, column=i % 5, sticky="w", padx=5)
 
     tk.Label(airport_frame, text="Enable airport announcements:", font=("Arial", 11)).pack(anchor="w", pady=5)
     tk.Checkbutton(airport_frame, variable=airport_announcement_var, font=("Arial", 9)).pack(anchor="w")
@@ -309,6 +387,11 @@ open_settings_window()
 config = load_config()
 import flask_server
 from flask_server import flight_info
+
+# Pokud byla vybrána cesta k flight_data.txt, aktualizujeme ji nyní
+if pending_flight_data_path:
+    flask_server.update_flight_data_path()
+
 print("🚀 Starting... please wait...")
 flask_thread = threading.Thread(target=flask_server.start_flask_server, daemon=True)
 flask_thread.start()
@@ -456,7 +539,6 @@ if selected_flight:
     enable_airport = config.get("enable_airport_announcement", True)
     captain_style = config.get("captain_style", "professional")
 
-    # Main loop
     # Main loop
     while True:
         phase = flask_server.flight_data["phase"]

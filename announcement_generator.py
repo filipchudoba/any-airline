@@ -511,7 +511,7 @@ def play_announcement(phase, flight_info, flight_data, all_langs_sorted, airport
         config = check()
         chime_start = config.get("chime_start", "none")
         chime_end = config.get("chime_end", "none")
-        chime_dir = os.path.join(os.path.dirname(__file__), "airport_chimes")
+        chime_dir = os.path.join(SCRIPT_DIR, "airport_chimes")
         logger.debug(f"Chime settings: start={chime_start}, end={chime_end}, dir={chime_dir}")
 
         # Určení jazyků pro generování hlášení
